@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Préstamo Equipos de Bilingüismo - I.E. San José Norte</title>
+  <link href="https://fonts.googleapis.com/css2?family=Tenorite:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>Préstamo Equipos de Bilingüismo - I.E. San José Norte</h1>
+    <div class="buttons-container">
+      <button class="reset-btn" onclick="resetearMalla()">Restaurar Préstamos de Equipos</button>
+    </div>
+    <!-- Estado de sincronización -->
+    <div id="sync-status"></div>
+    <!-- Contenedor de los equipos -->
+    <div id="malla"></div>
+    <h2>Registrar préstamo</h2>
+<form id="form-prestamo">
+  <label>Nombre del solicitante:</label><br />
+  <input type="text" name="nombre" required /><br />
+
+  <label>Elemento a prestar:</label><br />
+  <input type="text" name="elemento" required /><br />
+
+  <label>Fecha:</label><br />
+  <input type="date" name="fecha" required /><br />
+
+  <label>Hora:</label><br />
+  <input type="time" name="hora" required /><br />
+
+  <button type="submit">Enviar</button>
+</form>
+
+<div id="respuesta" style="margin-top: 10px;"></div>
+
+  </div>
+  <!-- Modal para préstamos y devoluciones -->
+  <div id="modalMetodos" class="modal" tabindex="-1">
+    <div class="modal-content modal-contenido">
+      <div class="modal-header">
+        <h2>Equipo</h2>
+        <span class="close" onclick="cerrarModal()" title="Cerrar">&times;</span>
+      </div>
+      <div class="modal-body">
+        <p>Complete la información del Equipo:</p>
+        <div id="listaMetodos"></div>
+      </div>
+    </div>
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>
