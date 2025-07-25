@@ -107,7 +107,7 @@ const ui = {
     }
 };
 
-// Modal mejorado con soporte completo para teclado
+// Modal mejorado con formularios específicos para préstamo y devolución
 const modal = {
     el: null,
     currentEquipo: null,
@@ -143,19 +143,6 @@ const modal = {
         if (header) header.textContent = `Equipo ${equipoNum}`;
         
         this.renderContent();
-        
-        // Establecer foco en el primer input del modal
-        setTimeout(() => {
-            let firstInput;
-            if (!isDevolucion) {
-                firstInput = this.el.querySelector('#documento');
-            } else {
-                firstInput = this.el.querySelector('#comentario');
-            }
-            if (firstInput) {
-                firstInput.focus();
-            }
-        }, 100);
     },
 
     close() {
@@ -170,8 +157,7 @@ const modal = {
         if (!container) return;
 
         const estado = state.getEquipoState(this.currentEquipo);
-        const isPrestado = estado.prestado;
-        const isDevolucion = isPrestado;
+        const isDevolucion = estado.prestado;
 
         // Formulario para préstamo (campos editables)
         if (!isDevolucion) {
@@ -301,6 +287,19 @@ const modal = {
 
         // Configurar eventos del formulario
         this.setupFormEvents();
+        
+        // Establecer foco apropiado
+        setTimeout(() => {
+            let firstInput;
+            if (!isDevolucion) {
+                firstInput = this.el.querySelector('#documento');
+            } else {
+                firstInput = this.el.querySelector('#comentario');
+            }
+            if (firstInput) {
+                firstInput.focus();
+            }
+        }, 100);
     },
 
     setupFormEvents() {
@@ -639,4 +638,4 @@ window.EquipmentLoanSystem = {
     version: '2.1.0'
 };
 
-console.log('📦 Sistema de Préstamo v2.1 - Con soporte completo de teclado');
+console.log('📦 Sistema de Préstamo v2.1 - Formularios específicos para préstamo y devolución');
