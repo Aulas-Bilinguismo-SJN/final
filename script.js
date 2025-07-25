@@ -139,44 +139,25 @@ const ui = {
 };
 
 // Carga de datos
-document.addEventListener("DOMContentLoaded", () => {
-  const hoy = new Date();
-  const fechaActual = hoy.toISOString().split('T')[0];
-  const campoFecha = document.getElementById("fecha");
-
-  if (campoFecha) {
-    campoFecha.value = fechaActual;
-  }
-
-  document.getElementById("formulario").addEventListener("submit", function(e) {
-    e.preventDefault();
-
-    const datos = {
-      nombre: document.getElementById("nombre").value,
-      documento: document.getElementById("documento").value,
-      libro: document.getElementById("libro").value,
-      profesor: document.getElementById("profesor").value,
-      asignatura: document.getElementById("asignatura").value,
-      fecha: campoFecha.value,
-    };
-
-    fetch("https://script.google.com/macros/s/AKfycbxCr0EnWrwO8TE1fgBK5aJ7yX--LAfJJi_pPn2quK9ug8kfU2h0V4-DQNiYgDyxDwC-/exec", {
-      method: "POST",
-      body: JSON.stringify(datos),
-    })
-    .then(res => res.text())
-    .then(response => {
-      alert("Registro exitoso: " + response);
-      document.getElementById("formulario").reset();
-      campoFecha.value = fechaActual; // Restablece la fecha automáticamente
-    })
-    .catch(error => {
-      console.error("Error:", error);
-      alert("Hubo un problema al registrar.");
-    });
-  });
-});
 const loader = {
+    async loadPersonas() {
+        const resp = await fetch(CONFIG.URLS.PERSONAS);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        
+        const data = utils.parseGoogleResponse(await resp.text());
+        const personas = data.table.rows.slice(1)
+            .map(row => ({
+                nombreCompleto: utils.getCellValue(row.c[1]),
+                documento: utils.getCellValue(row.c[2]),
+                curso: utils.getCellValue(row.c[3]),
+                telefono: utils.getCellValue(row.c[4])
+            }))
+            .filter(p => p.documento && utils.isValidDoc(p.documento));
+        
+        state.setPersonas(personas);
+        console.log(`✓ Personas: ${state.personas.size}`);
+    },
+    
     async loadPersonas() {
         const resp = await fetch(CONFIG.URLS.PERSONAS);
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
