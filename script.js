@@ -1,16 +1,27 @@
-// Sistema de Préstamo de Equipos - Versión Compacta
+// Sistema de Préstamo de Equipos - Versión Corregida
 const CONFIG = {
     URLS: {
         PERSONAS: 'https://docs.google.com/spreadsheets/d/1GU1oKIb9E0Vvwye6zRB2F_fT2jGzRvJ0WoLtWKuio-E/gviz/tq?tqx=out:json&gid=1744634045',
         HISTORIAL: 'https://docs.google.com/spreadsheets/d/1ohT8rfNsG4h7JjPZllHoyrxePutKsv2Q-5mBeUozia0/gviz/tq?tqx=out:json&gid=1185155654',
-        GOOGLE_FORM: 'https://docs.google.com/forms/d/e/1FAIpQLSfe3gplfkjNe3qEjC5l_Jqhsrk_zPSdQM_Wg0M6BUhoHtj9tg/formResponse'
+        GOOGLE_FORM: 'https://docs.google.com/forms/d/e/1FAIpQLSfe3gplfkjNe3qEjC5l_Jqhsrk_zPSdQM_Wg0M6BUhoHtj9tg/formResponse',
+        URL_WEB_APP: 'https://script.google.com/macros/s/AKfycbxCr0EnWrwO8TE1fgBK5aJ7yX--LAfJJi_pPn2quK9ug8kfU2h0V4-DQNiYgDyxDwC-/exec'
     },
     FORM_ENTRIES: {
-        equipo: 'entry.1834514522', nombreCompleto: 'entry.1486223911', documento: 'entry.1695051506',
-        curso: 'entry.564849635', telefono: 'entry.414930075', profesorEncargado: 'entry.116949605',
-        materia: 'entry.1714096158', tipo: 'entry.801360829', comentario: 'entry.43776270'
+        equipo: 'entry.1834514522', 
+        nombreCompleto: 'entry.1486223911', 
+        documento: 'entry.1695051506',
+        curso: 'entry.564849635', 
+        telefono: 'entry.414930075', 
+        profesorEncargado: 'entry.116949605',
+        materia: 'entry.1714096158', 
+        tipo: 'entry.801360829', 
+        comentario: 'entry.43776270'
     },
-    SYNC_INTERVAL: 30000, FORM_DELAY: 15000, TOTAL_EQUIPOS: 40, RETRY_ATTEMPTS: 3, RETRY_DELAY: 1000
+    SYNC_INTERVAL: 30000, 
+    FORM_DELAY: 15000, 
+    TOTAL_EQUIPOS: 40, 
+    RETRY_ATTEMPTS: 3, 
+    RETRY_DELAY: 1000
 };
 
 // Estado global
@@ -21,17 +32,29 @@ const state = {
     isLoading: false,
     syncIntervalId: null,
     
-    setPersonas(arr) { this.personas.clear(); arr.forEach(p => p.documento && this.personas.set(p.documento, p)); },
+    setPersonas(arr) { 
+        this.personas.clear(); 
+        arr.forEach(p => p.documento && this.personas.set(p.documento, p)); 
+    },
     findPersona(doc) { return this.personas.get(doc) || null; },
     addHistorial(entry) { this.historial.unshift({...entry, marcaTemporal: new Date()}); },
-    removeHistorial(entry) { const i = this.historial.indexOf(entry); if(i > -1) this.historial.splice(i, 1); },
-    setHistorial(arr) { this.historial = arr.sort((a, b) => b.marcaTemporal - a.marcaTemporal); },
+    removeHistorial(entry) { 
+        const i = this.historial.indexOf(entry); 
+        if(i > -1) this.historial.splice(i, 1); 
+    },
+    setHistorial(arr) { 
+        this.historial = arr.sort((a, b) => b.marcaTemporal - a.marcaTemporal); 
+    },
     
     getEquipoState(num) {
-        const movs = this.historial.filter(h => h.equipo === num);
+        const movs = this.historial.filter(h => h.equipo === num.toString());
         if (!movs.length) return {prestado: false};
         const ultimo = movs[0];
-        return {prestado: ultimo.tipo === 'Préstamo', ultimoMovimiento: ultimo, nombreCompleto: ultimo.nombreCompleto};
+        return {
+            prestado: ultimo.tipo === 'Préstamo', 
+            ultimoMovimiento: ultimo, 
+            nombreCompleto: ultimo.nombreCompleto
+        };
     }
 };
 
@@ -158,29 +181,6 @@ const loader = {
         console.log(`✓ Personas: ${state.personas.size}`);
     },
     
-    async loadPersonas() {
-        const resp = await fetch(CONFIG.URLS.PERSONAS);
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        
-        const data = utils.parseGoogleResponse(await resp.text());
-        const personas = data.table.rows.slice(1)
-            .map(row => ({
-                nombreCompleto: utils.getCellValue(row.c[1]),
-                documento: utils.getCellValue(row.c[2]),
-                curso: utils.getCellValue(row.c[3]),
-                telefono: utils.getCellValue(row.c[4])
-            }))
-            .filter(p => p.documento && utils.isValidDoc(p.documento));
-        
-        state.setPersonas(personas);
-        console.log(`✓ Personas: ${state.personas.size}`);
-    },
-    const CONFIG = {
-  URL_WEB_APP: 'https://script.google.com/macros/s/AKfycbxCr0EnWrwO8TE1fgBK5aJ7yX--LAfJJi_pPn2quK9ug8kfU2h0V4-DQNiYgDyxDwC-/exec',
-  URLS: {
-    HISTORIAL: 'https://script.google.com/macros/s/AKfycbxCr0EnWrwO8TE1fgBK5aJ7yX--LAfJJi_pPn2quK9ug8kfU2h0V4-DQNiYgDyxDwC-/exec?action=historial'
-  }
-};
     async loadHistorial() {
         const resp = await fetch(CONFIG.URLS.HISTORIAL);
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -207,28 +207,7 @@ const loader = {
     
     async loadAll() {
         if (state.isLoading) return;
-document.getElementById("registro-form").addEventListener("submit", function(e) {
-  e.preventDefault();
-
-  const formData = new FormData(e.target);
-  const datos = new URLSearchParams(formData);
-
-  fetch(CONFIG.URL_WEB_APP, {
-    method: "POST",
-    body: datos
-  })
-  .then(response => response.text())
-  .then(result => {
-    document.getElementById("mensaje").textContent = "Registro exitoso.";
-    e.target.reset(); // Limpia el formulario
-    cargaHistorial(); // Recarga los datos
-  })
-  .catch(error => {
-    console.error("Error al enviar:", error);
-    document.getElementById("mensaje").textContent = "Error al registrar.";
-  });
-});
-
+        
         state.isLoading = true;
         ui.showSync('Sincronizando...', 'info', false);
         
@@ -250,9 +229,14 @@ document.getElementById("registro-form").addEventListener("submit", function(e) 
 const grid = {
     create() {
         const malla = document.getElementById('malla');
-        if (!malla) return;
+        if (!malla) {
+            console.error('No se encontró el elemento con id "malla"');
+            return;
+        }
         
+        console.log('Creando malla de equipos...');
         const frag = document.createDocumentFragment();
+        
         for (let i = 1; i <= CONFIG.TOTAL_EQUIPOS; i++) {
             const div = document.createElement('div');
             div.className = 'ramo';
@@ -270,12 +254,16 @@ const grid = {
                 this.style.transform = this.style.boxShadow = '';
             };
             
-            div.innerHTML = `<div style="font-weight:bold">Equipo ${i}</div><div class="estado-equipo" style="font-size:0.9em;margin-top:5px">Disponible</div>`;
+            div.innerHTML = `
+                <div style="font-weight:bold">Equipo ${i}</div>
+                <div class="estado-equipo" style="font-size:0.9em;margin-top:5px">Disponible</div>
+            `;
             frag.appendChild(div);
         }
         
         malla.innerHTML = '';
         malla.appendChild(frag);
+        console.log(`✓ Creados ${CONFIG.TOTAL_EQUIPOS} equipos`);
     },
     
     updateAll() {
@@ -288,11 +276,19 @@ const grid = {
             
             if (estado.prestado) {
                 el.classList.add('equipo-prestado');
-                Object.assign(el.style, {backgroundColor: '#d4edda', borderColor: '#28a745', color: '#155724'});
+                Object.assign(el.style, {
+                    backgroundColor: '#d4edda', 
+                    borderColor: '#28a745', 
+                    color: '#155724'
+                });
                 if (statusEl) statusEl.textContent = `Prestado a: ${estado.nombreCompleto}`;
             } else {
                 el.classList.add('equipo-disponible');
-                Object.assign(el.style, {backgroundColor: '#f8f9fa', borderColor: '#dee2e6', color: '#495057'});
+                Object.assign(el.style, {
+                    backgroundColor: '#f8f9fa', 
+                    borderColor: '#dee2e6', 
+                    color: '#495057'
+                });
                 if (statusEl) statusEl.textContent = 'Disponible';
             }
         });
@@ -531,34 +527,56 @@ const debug = {
         }
         console.table(prestados);
     },
-    reset: () => confirm('¿Resetear vista?') && (state.setHistorial([]), grid.updateAll()),
+    reset: () => {
+        if (confirm('¿Resetear vista?')) {
+            state.setHistorial([]);
+            grid.updateAll();
+        }
+    },
     sync: () => loader.loadAll()
 };
 
 // Inicialización
 const app = {
     async init() {
+        console.log('🚀 Iniciando sistema...');
+        
         try {
             const missing = ['malla', 'modalMetodos'].filter(id => !document.getElementById(id));
             if (missing.length) throw new Error(`Elementos faltantes: ${missing.join(', ')}`);
             
+            console.log('✓ Elementos encontrados');
+            
             grid.create();
             events.init();
             events.setupSync();
-            await loader.loadAll();
+            
+            // Intentar cargar datos, pero no fallar si no se puede
+            try {
+                await loader.loadAll();
+            } catch (e) {
+                console.warn('No se pudieron cargar datos iniciales:', e);
+                ui.showSync('Sin conexión - modo offline', 'warning');
+            }
             
             window.debug = debug;
-            console.log('✅ Sistema inicializado');
+            console.log('✅ Sistema inicializado correctamente');
         } catch (e) {
-            console.error('Error:', e);
-            alert(`Error: ${e.message}`);
+            console.error('❌ Error fatal:', e);
+            alert(`Error inicializando sistema: ${e.message}`);
         }
     }
 };
 
 // Eventos de carga
-document.addEventListener('DOMContentLoaded', app.init);
-window.addEventListener('beforeunload', () => state.syncIntervalId && clearInterval(state.syncIntervalId));
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('📄 DOM cargado, iniciando aplicación...');
+    app.init();
+});
+
+window.addEventListener('beforeunload', () => {
+    if (state.syncIntervalId) clearInterval(state.syncIntervalId);
+});
 
 // API pública
 window.EquipmentLoanSystem = {
@@ -572,4 +590,4 @@ window.EquipmentLoanSystem = {
     })
 };
 
-console.log('📦 Sistema de Préstamo v2.0 - Compacto');
+console.log('📦 Sistema de Préstamo v2.1 - Corregido');
