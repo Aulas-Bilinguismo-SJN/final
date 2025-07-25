@@ -107,7 +107,7 @@ const ui = {
     }
 };
 
-// Modal mejorado con formularios específicos para préstamo y devolución
+// Modal mejorado
 const modal = {
     el: null,
     currentEquipo: null,
@@ -143,6 +143,14 @@ const modal = {
         if (header) header.textContent = `Equipo ${equipoNum}`;
         
         this.renderContent();
+        
+        // Establecer foco en el primer input del modal
+        setTimeout(() => {
+            const firstInput = this.el.querySelector('input, textarea, select');
+            if (firstInput) {
+                firstInput.focus();
+            }
+        }, 100);
     },
 
     close() {
@@ -157,157 +165,154 @@ const modal = {
         if (!container) return;
 
         const estado = state.getEquipoState(this.currentEquipo);
-        const isDevolucion = estado.prestado;
+        const isPrestado = estado.prestado;
 
-        // Formulario para préstamo (campos editables)
-        if (!isDevolucion) {
-            container.innerHTML = `
-                <form id="equipmentForm" style="display: flex; flex-direction: column; gap: 15px;">
-                    <div style="display: flex; flex-direction: column; gap: 10px;">
-                        <label for="documento" style="font-weight: bold;">Documento:</label>
-                        <input type="text" 
-                               id="documento" 
-                               name="documento" 
-                               required 
-                               autocomplete="off"
-                               style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;"
-                               placeholder="Ingrese el documento del estudiante">
-                    </div>
-
-                    <div style="display: flex; flex-direction: column; gap: 10px;">
-                        <label for="profesorEncargado" style="font-weight: bold;">Profesor Encargado:</label>
-                        <input type="text" 
-                               id="profesorEncargado" 
-                               name="profesorEncargado" 
-                               required 
-                               autocomplete="off"
-                               style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;"
-                               placeholder="Nombre del profesor responsable">
-                    </div>
-
-                    <div style="display: flex; flex-direction: column; gap: 10px;">
-                        <label for="materia" style="font-weight: bold;">Asignatura:</label>
-                        <input type="text" 
-                               id="materia" 
-                               name="materia" 
-                               required 
-                               autocomplete="off"
-                               style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;"
-                               placeholder="Asignatura para la cual se usa el equipo">
-                    </div>
-
-                    <!-- Campos ocultos que se llenan automáticamente -->
-                    <input type="hidden" id="nombreCompleto" name="nombreCompleto">
-                    <input type="hidden" id="curso" name="curso">
-                    <input type="hidden" id="telefono" name="telefono">
-                    <input type="hidden" id="tipo" name="tipo" value="Préstamo">
-
-                    <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
-                        <button type="button" 
-                                onclick="modal.close()" 
-                                style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                            Cancelar
-                        </button>
-                        <button type="submit" 
-                                style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                            Registrar Préstamo
-                        </button>
-                    </div>
-                </form>
-            `;
-        } 
-        // Formulario para devolución (campos no editables + comentario)
-        else {
-            const ultimoMov = estado.ultimoMovimiento;
-            container.innerHTML = `
-                <form id="equipmentForm" style="display: flex; flex-direction: column; gap: 15px;">
-                    <div style="background: #f8f9fa; padding: 15px; border-radius: 4px; border: 1px solid #dee2e6;">
-                        <h4 style="margin: 0 0 10px 0; color: #495057;">Información del Préstamo Actual:</h4>
-                        
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
-                            <div>
-                                <strong>Documento:</strong><br>
-                                <span style="color: #6c757d;">${ultimoMov?.documento || 'N/A'}</span>
-                            </div>
-                            <div>
-                                <strong>Estudiante:</strong><br>
-                                <span style="color: #6c757d;">${ultimoMov?.nombreCompleto || 'N/A'}</span>
-                            </div>
-                        </div>
-                        
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
-                            <div>
-                                <strong>Profesor:</strong><br>
-                                <span style="color: #6c757d;">${ultimoMov?.profesorEncargado || 'N/A'}</span>
-                            </div>
-                            <div>
-                                <strong>Asignatura:</strong><br>
-                                <span style="color: #6c757d;">${ultimoMov?.materia || 'N/A'}</span>
-                            </div>
-                        </div>
-                        
-                        <div>
-                            <strong>Fecha de Préstamo:</strong><br>
-                            <span style="color: #6c757d;">${utils.formatDateTime(ultimoMov?.marcaTemporal)}</span>
-                        </div>
-                    </div>
-
-                    <div style="display: flex; flex-direction: column; gap: 10px;">
-                        <label for="comentario" style="font-weight: bold;">Comentario sobre la Devolución:</label>
-                        <textarea id="comentario" 
-                                  name="comentario" 
-                                  rows="4" 
-                                  style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; resize: vertical;"
-                                  placeholder="Observaciones sobre el estado del equipo, problemas encontrados, etc."></textarea>
-                    </div>
-
-                    <!-- Campos ocultos con datos del préstamo original -->
-                    <input type="hidden" id="documento" name="documento" value="${ultimoMov?.documento || ''}">
-                    <input type="hidden" id="nombreCompleto" name="nombreCompleto" value="${ultimoMov?.nombreCompleto || ''}">
-                    <input type="hidden" id="curso" name="curso" value="${ultimoMov?.curso || ''}">
-                    <input type="hidden" id="telefono" name="telefono" value="${ultimoMov?.telefono || ''}">
-                    <input type="hidden" id="profesorEncargado" name="profesorEncargado" value="${ultimoMov?.profesorEncargado || ''}">
-                    <input type="hidden" id="materia" name="materia" value="${ultimoMov?.materia || ''}">
-                    <input type="hidden" id="tipo" name="tipo" value="Devolución">
-
-                    <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
-                        <button type="button" 
-                                onclick="modal.close()" 
-                                style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                            Cancelar
-                        </button>
-                        <button type="submit" 
-                                style="padding: 10px 20px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                            Registrar Devolución
-                        </button>
-                    </div>
-                </form>
-            `;
+        if (isPrestado) {
+            // Modal para devolución - campos readonly + comentario
+            container.innerHTML = this.generateReturnForm(estado.ultimoMovimiento);
+        } else {
+            // Modal para préstamo - solo documento, profesor y asignatura
+            container.innerHTML = this.generateLoanForm();
         }
 
-        // Configurar eventos del formulario
         this.setupFormEvents();
-        
-        // Establecer foco apropiado
-        setTimeout(() => {
-            let firstInput;
-            if (!isDevolucion) {
-                firstInput = this.el.querySelector('#documento');
-            } else {
-                firstInput = this.el.querySelector('#comentario');
-            }
-            if (firstInput) {
-                firstInput.focus();
-            }
-        }, 100);
+    },
+
+    generateLoanForm() {
+        return `
+            <form id="equipmentForm" style="display: flex; flex-direction: column; gap: 15px;">
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <label for="documento" style="font-weight: bold;">Documento:</label>
+                    <input type="text" 
+                           id="documento" 
+                           name="documento" 
+                           required 
+                           autocomplete="off"
+                           style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;"
+                           placeholder="Ingrese el documento">
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <label for="profesorEncargado" style="font-weight: bold;">Profesor Encargado:</label>
+                    <input type="text" 
+                           id="profesorEncargado" 
+                           name="profesorEncargado" 
+                           required 
+                           autocomplete="off"
+                           style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;"
+                           placeholder="Nombre del profesor">
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <label for="materia" style="font-weight: bold;">Asignatura:</label>
+                    <input type="text" 
+                           id="materia" 
+                           name="materia" 
+                           required 
+                           autocomplete="off"
+                           style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;"
+                           placeholder="Asignatura para la cual se usa">
+                </div>
+
+                <input type="hidden" id="tipo" name="tipo" value="Préstamo">
+
+                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                    <button type="button" 
+                            onclick="modal.close()" 
+                            style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        Cancelar
+                    </button>
+                    <button type="submit" 
+                            style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        Registrar Préstamo
+                    </button>
+                </div>
+            </form>
+        `;
+    },
+
+    generateReturnForm(ultimoMovimiento) {
+        return `
+            <form id="equipmentForm" style="display: flex; flex-direction: column; gap: 15px;">
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <label style="font-weight: bold;">Documento:</label>
+                    <input type="text" 
+                           id="documento" 
+                           name="documento" 
+                           value="${ultimoMovimiento.documento || ''}"
+                           readonly
+                           style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; background-color: #f8f9fa;">
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <label style="font-weight: bold;">Estudiante:</label>
+                    <input type="text" 
+                           value="${ultimoMovimiento.nombreCompleto || ''}"
+                           readonly
+                           style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; background-color: #f8f9fa;">
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <label style="font-weight: bold;">Curso:</label>
+                    <input type="text" 
+                           value="${ultimoMovimiento.curso || ''}"
+                           readonly
+                           style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; background-color: #f8f9fa;">
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <label style="font-weight: bold;">Profesor Encargado:</label>
+                    <input type="text" 
+                           id="profesorEncargado" 
+                           name="profesorEncargado" 
+                           value="${ultimoMovimiento.profesorEncargado || ''}"
+                           readonly
+                           style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; background-color: #f8f9fa;">
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <label style="font-weight: bold;">Asignatura:</label>
+                    <input type="text" 
+                           id="materia" 
+                           name="materia" 
+                           value="${ultimoMovimiento.materia || ''}"
+                           readonly
+                           style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; background-color: #f8f9fa;">
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <label for="comentario" style="font-weight: bold;">Comentario (opcional):</label>
+                    <textarea id="comentario" 
+                              name="comentario" 
+                              rows="3" 
+                              style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; resize: vertical;"
+                              placeholder="Observaciones sobre el estado del equipo"></textarea>
+                </div>
+
+                <!-- Campos ocultos para envío -->
+                <input type="hidden" name="nombreCompleto" value="${ultimoMovimiento.nombreCompleto || ''}">
+                <input type="hidden" name="curso" value="${ultimoMovimiento.curso || ''}">
+                <input type="hidden" name="telefono" value="${ultimoMovimiento.telefono || ''}">
+                <input type="hidden" id="tipo" name="tipo" value="Devolución">
+
+                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                    <button type="button" 
+                            onclick="modal.close()" 
+                            style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        Cancelar
+                    </button>
+                    <button type="submit" 
+                            style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        Registrar Devolución
+                    </button>
+                </div>
+            </form>
+        `;
     },
 
     setupFormEvents() {
         const form = document.getElementById('equipmentForm');
         if (!form) return;
-
-        const estado = state.getEquipoState(this.currentEquipo);
-        const isDevolucion = estado.prestado;
 
         // Evento de envío del formulario
         form.addEventListener('submit', async (e) => {
@@ -318,20 +323,6 @@ const modal = {
             data.equipo = this.currentEquipo;
             data.marcaTemporal = new Date().toISOString();
 
-            // Para préstamos, validar que el documento exista en la base de personas
-            if (!isDevolucion) {
-                const persona = state.findPersona(data.documento);
-                if (!persona) {
-                    ui.showSync('Documento no encontrado en la base de datos', 'error');
-                    return;
-                }
-                
-                // Llenar automáticamente los datos de la persona
-                data.nombreCompleto = persona.nombreCompleto;
-                data.curso = persona.curso;
-                data.telefono = persona.telefono;
-            }
-
             try {
                 const submitBtn = form.querySelector('button[type="submit"]');
                 const originalText = submitBtn.textContent;
@@ -340,7 +331,7 @@ const modal = {
 
                 await forms.submit(data);
                 
-                ui.showSync(`${data.tipo} registrado exitosamente`, 'success');
+                ui.showSync('Registro exitoso', 'success');
                 this.close();
                 
                 // Actualizar estado local
@@ -353,37 +344,52 @@ const modal = {
             }
         });
 
-        // Solo para préstamos: evento de búsqueda automática por documento
-        if (!isDevolucion) {
-            const docInput = document.getElementById('documento');
-            if (docInput) {
-                docInput.addEventListener('input', (e) => {
-                    const doc = e.target.value.trim();
-                    if (doc && utils.isValidDoc(doc)) {
-                        const persona = state.findPersona(doc);
-                        if (persona) {
-                            // Mostrar información de validación visual
-                            docInput.style.borderColor = '#28a745';
-                            docInput.style.backgroundColor = '#d4edda';
-                            docInput.title = `${persona.nombreCompleto} - ${persona.curso}`;
-                        } else {
-                            docInput.style.borderColor = '#dc3545';
-                            docInput.style.backgroundColor = '#f8d7da';
-                            docInput.title = 'Documento no encontrado en la base de datos';
-                        }
-                    } else {
-                        docInput.style.borderColor = '#ccc';
-                        docInput.style.backgroundColor = 'white';
-                        docInput.title = '';
+        // Evento de búsqueda automática por documento (solo en préstamos)
+        const docInput = document.getElementById('documento');
+        if (docInput && !docInput.readOnly) {
+            docInput.addEventListener('input', (e) => {
+                const doc = e.target.value.trim();
+                if (doc && utils.isValidDoc(doc)) {
+                    const persona = state.findPersona(doc);
+                    if (persona) {
+                        this.autofillPersonData(data);
                     }
-                });
-            }
+                }
+            });
         }
 
         // Prevenir que el modal se cierre cuando se hace clic en los inputs
         form.addEventListener('click', (e) => {
             e.stopPropagation();
         });
+    },
+
+    autofillPersonData(data) {
+        // Los datos de la persona se incluirán automáticamente en el envío
+        // pero no se muestran en el formulario de préstamo
+        const persona = state.findPersona(data.documento);
+        if (persona) {
+            // Agregar campos ocultos con los datos de la persona
+            const form = document.getElementById('equipmentForm');
+            if (form) {
+                const hiddenFields = [
+                    {name: 'nombreCompleto', value: persona.nombreCompleto},
+                    {name: 'curso', value: persona.curso},
+                    {name: 'telefono', value: persona.telefono}
+                ];
+
+                hiddenFields.forEach(({name, value}) => {
+                    let hiddenInput = form.querySelector(`input[name="${name}"]`);
+                    if (!hiddenInput) {
+                        hiddenInput = document.createElement('input');
+                        hiddenInput.type = 'hidden';
+                        hiddenInput.name = name;
+                        form.appendChild(hiddenInput);
+                    }
+                    hiddenInput.value = value || '';
+                });
+            }
+        }
     }
 };
 
@@ -635,7 +641,7 @@ window.EquipmentLoanSystem = {
     modal,
     debug,
     reload: () => location.reload(),
-    version: '2.1.0'
+    version: '2.2.0'
 };
 
-console.log('📦 Sistema de Préstamo v2.1 - Formularios específicos para préstamo y devolución');
+console.log('📦 Sistema de Préstamo v2.2 - Con formularios diferenciados');
