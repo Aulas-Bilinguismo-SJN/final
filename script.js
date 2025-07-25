@@ -146,7 +146,12 @@ const modal = {
         
         // Establecer foco en el primer input del modal
         setTimeout(() => {
-            const firstInput = this.el.querySelector('input, textarea, select');
+            let firstInput;
+            if (!isDevolucion) {
+                firstInput = this.el.querySelector('#documento');
+            } else {
+                firstInput = this.el.querySelector('#comentario');
+            }
             if (firstInput) {
                 firstInput.focus();
             }
@@ -166,131 +171,144 @@ const modal = {
 
         const estado = state.getEquipoState(this.currentEquipo);
         const isPrestado = estado.prestado;
+        const isDevolucion = isPrestado;
 
-        container.innerHTML = `
-            <form id="equipmentForm" style="display: flex; flex-direction: column; gap: 15px;">
-                <div style="display: flex; flex-direction: column; gap: 10px;">
-                    <label for="documento" style="font-weight: bold;">Documento:</label>
-                    <input type="text" 
-                           id="documento" 
-                           name="documento" 
-                           required 
-                           autocomplete="off"
-                           style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;"
-                           placeholder="Ingrese el documento">
-                </div>
+        // Formulario para préstamo (campos editables)
+        if (!isDevolucion) {
+            container.innerHTML = `
+                <form id="equipmentForm" style="display: flex; flex-direction: column; gap: 15px;">
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <label for="documento" style="font-weight: bold;">Documento:</label>
+                        <input type="text" 
+                               id="documento" 
+                               name="documento" 
+                               required 
+                               autocomplete="off"
+                               style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;"
+                               placeholder="Ingrese el documento del estudiante">
+                    </div>
 
-                <div style="display: flex; flex-direction: column; gap: 10px;">
-                    <label for="nombreCompleto" style="font-weight: bold;">Nombre Completo:</label>
-                    <input type="text" 
-                           id="nombreCompleto" 
-                           name="nombreCompleto" 
-                           required 
-                           autocomplete="off"
-                           style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;"
-                           placeholder="Nombre completo del estudiante">
-                </div>
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <label for="profesorEncargado" style="font-weight: bold;">Profesor Encargado:</label>
+                        <input type="text" 
+                               id="profesorEncargado" 
+                               name="profesorEncargado" 
+                               required 
+                               autocomplete="off"
+                               style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;"
+                               placeholder="Nombre del profesor responsable">
+                    </div>
 
-                <div style="display: flex; flex-direction: column; gap: 10px;">
-                    <label for="curso" style="font-weight: bold;">Curso:</label>
-                    <input type="text" 
-                           id="curso" 
-                           name="curso" 
-                           required 
-                           autocomplete="off"
-                           style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;"
-                           placeholder="Ejemplo: 10A, 11B">
-                </div>
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <label for="materia" style="font-weight: bold;">Asignatura:</label>
+                        <input type="text" 
+                               id="materia" 
+                               name="materia" 
+                               required 
+                               autocomplete="off"
+                               style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;"
+                               placeholder="Asignatura para la cual se usa el equipo">
+                    </div>
 
-                <div style="display: flex; flex-direction: column; gap: 10px;">
-                    <label for="telefono" style="font-weight: bold;">Teléfono:</label>
-                    <input type="tel" 
-                           id="telefono" 
-                           name="telefono" 
-                           autocomplete="off"
-                           style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;"
-                           placeholder="Número de teléfono">
-                </div>
+                    <!-- Campos ocultos que se llenan automáticamente -->
+                    <input type="hidden" id="nombreCompleto" name="nombreCompleto">
+                    <input type="hidden" id="curso" name="curso">
+                    <input type="hidden" id="telefono" name="telefono">
+                    <input type="hidden" id="tipo" name="tipo" value="Préstamo">
 
-                <div style="display: flex; flex-direction: column; gap: 10px;">
-                    <label for="profesorEncargado" style="font-weight: bold;">Profesor Encargado:</label>
-                    <input type="text" 
-                           id="profesorEncargado" 
-                           name="profesorEncargado" 
-                           required 
-                           autocomplete="off"
-                           style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;"
-                           placeholder="Nombre del profesor">
-                </div>
+                    <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                        <button type="button" 
+                                onclick="modal.close()" 
+                                style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            Cancelar
+                        </button>
+                        <button type="submit" 
+                                style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            Registrar Préstamo
+                        </button>
+                    </div>
+                </form>
+            `;
+        } 
+        // Formulario para devolución (campos no editables + comentario)
+        else {
+            const ultimoMov = estado.ultimoMovimiento;
+            container.innerHTML = `
+                <form id="equipmentForm" style="display: flex; flex-direction: column; gap: 15px;">
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 4px; border: 1px solid #dee2e6;">
+                        <h4 style="margin: 0 0 10px 0; color: #495057;">Información del Préstamo Actual:</h4>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                            <div>
+                                <strong>Documento:</strong><br>
+                                <span style="color: #6c757d;">${ultimoMov?.documento || 'N/A'}</span>
+                            </div>
+                            <div>
+                                <strong>Estudiante:</strong><br>
+                                <span style="color: #6c757d;">${ultimoMov?.nombreCompleto || 'N/A'}</span>
+                            </div>
+                        </div>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                            <div>
+                                <strong>Profesor:</strong><br>
+                                <span style="color: #6c757d;">${ultimoMov?.profesorEncargado || 'N/A'}</span>
+                            </div>
+                            <div>
+                                <strong>Asignatura:</strong><br>
+                                <span style="color: #6c757d;">${ultimoMov?.materia || 'N/A'}</span>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <strong>Fecha de Préstamo:</strong><br>
+                            <span style="color: #6c757d;">${utils.formatDateTime(ultimoMov?.marcaTemporal)}</span>
+                        </div>
+                    </div>
 
-                <div style="display: flex; flex-direction: column; gap: 10px;">
-                    <label for="materia" style="font-weight: bold;">Materia:</label>
-                    <input type="text" 
-                           id="materia" 
-                           name="materia" 
-                           required 
-                           autocomplete="off"
-                           style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;"
-                           placeholder="Materia para la cual se usa">
-                </div>
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <label for="comentario" style="font-weight: bold;">Comentario sobre la Devolución:</label>
+                        <textarea id="comentario" 
+                                  name="comentario" 
+                                  rows="4" 
+                                  style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; resize: vertical;"
+                                  placeholder="Observaciones sobre el estado del equipo, problemas encontrados, etc."></textarea>
+                    </div>
 
-                <div style="display: flex; flex-direction: column; gap: 10px;">
-                    <label for="tipo" style="font-weight: bold;">Tipo de Movimiento:</label>
-                    <select id="tipo" 
-                            name="tipo" 
-                            required 
-                            style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;">
-                        <option value="">Seleccione una opción</option>
-                        <option value="Préstamo" ${!isPrestado ? 'selected' : ''}>Préstamo</option>
-                        <option value="Devolución" ${isPrestado ? 'selected' : ''}>Devolución</option>
-                    </select>
-                </div>
+                    <!-- Campos ocultos con datos del préstamo original -->
+                    <input type="hidden" id="documento" name="documento" value="${ultimoMov?.documento || ''}">
+                    <input type="hidden" id="nombreCompleto" name="nombreCompleto" value="${ultimoMov?.nombreCompleto || ''}">
+                    <input type="hidden" id="curso" name="curso" value="${ultimoMov?.curso || ''}">
+                    <input type="hidden" id="telefono" name="telefono" value="${ultimoMov?.telefono || ''}">
+                    <input type="hidden" id="profesorEncargado" name="profesorEncargado" value="${ultimoMov?.profesorEncargado || ''}">
+                    <input type="hidden" id="materia" name="materia" value="${ultimoMov?.materia || ''}">
+                    <input type="hidden" id="tipo" name="tipo" value="Devolución">
 
-                <div style="display: flex; flex-direction: column; gap: 10px;">
-                    <label for="comentario" style="font-weight: bold;">Comentario (opcional):</label>
-                    <textarea id="comentario" 
-                              name="comentario" 
-                              rows="3" 
-                              style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; resize: vertical;"
-                              placeholder="Observaciones adicionales"></textarea>
-                </div>
-
-                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
-                    <button type="button" 
-                            onclick="modal.close()" 
-                            style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                        Cancelar
-                    </button>
-                    <button type="submit" 
-                            style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                        Registrar
-                    </button>
-                </div>
-            </form>
-        `;
+                    <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                        <button type="button" 
+                                onclick="modal.close()" 
+                                style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            Cancelar
+                        </button>
+                        <button type="submit" 
+                                style="padding: 10px 20px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            Registrar Devolución
+                        </button>
+                    </div>
+                </form>
+            `;
+        }
 
         // Configurar eventos del formulario
         this.setupFormEvents();
-        
-        // Si el equipo está prestado, prellenar con datos del último movimiento
-        if (isPrestado && estado.ultimoMovimiento) {
-            this.fillFormWithLastMovement(estado.ultimoMovimiento);
-        }
-    },
-
-    fillFormWithLastMovement(movimiento) {
-        const fields = ['documento', 'nombreCompleto', 'curso', 'telefono', 'profesorEncargado', 'materia'];
-        fields.forEach(field => {
-            const input = document.getElementById(field);
-            if (input && movimiento[field]) {
-                input.value = movimiento[field];
-            }
-        });
     },
 
     setupFormEvents() {
         const form = document.getElementById('equipmentForm');
         if (!form) return;
+
+        const estado = state.getEquipoState(this.currentEquipo);
+        const isDevolucion = estado.prestado;
 
         // Evento de envío del formulario
         form.addEventListener('submit', async (e) => {
@@ -301,6 +319,20 @@ const modal = {
             data.equipo = this.currentEquipo;
             data.marcaTemporal = new Date().toISOString();
 
+            // Para préstamos, validar que el documento exista en la base de personas
+            if (!isDevolucion) {
+                const persona = state.findPersona(data.documento);
+                if (!persona) {
+                    ui.showSync('Documento no encontrado en la base de datos', 'error');
+                    return;
+                }
+                
+                // Llenar automáticamente los datos de la persona
+                data.nombreCompleto = persona.nombreCompleto;
+                data.curso = persona.curso;
+                data.telefono = persona.telefono;
+            }
+
             try {
                 const submitBtn = form.querySelector('button[type="submit"]');
                 const originalText = submitBtn.textContent;
@@ -309,7 +341,7 @@ const modal = {
 
                 await forms.submit(data);
                 
-                ui.showSync('Registro exitoso', 'success');
+                ui.showSync(`${data.tipo} registrado exitosamente`, 'success');
                 this.close();
                 
                 // Actualizar estado local
@@ -322,38 +354,36 @@ const modal = {
             }
         });
 
-        // Evento de búsqueda automática por documento
-        const docInput = document.getElementById('documento');
-        if (docInput) {
-            docInput.addEventListener('input', (e) => {
-                const doc = e.target.value.trim();
-                if (doc && utils.isValidDoc(doc)) {
-                    const persona = state.findPersona(doc);
-                    if (persona) {
-                        this.autofillPersonData(persona);
+        // Solo para préstamos: evento de búsqueda automática por documento
+        if (!isDevolucion) {
+            const docInput = document.getElementById('documento');
+            if (docInput) {
+                docInput.addEventListener('input', (e) => {
+                    const doc = e.target.value.trim();
+                    if (doc && utils.isValidDoc(doc)) {
+                        const persona = state.findPersona(doc);
+                        if (persona) {
+                            // Mostrar información de validación visual
+                            docInput.style.borderColor = '#28a745';
+                            docInput.style.backgroundColor = '#d4edda';
+                            docInput.title = `${persona.nombreCompleto} - ${persona.curso}`;
+                        } else {
+                            docInput.style.borderColor = '#dc3545';
+                            docInput.style.backgroundColor = '#f8d7da';
+                            docInput.title = 'Documento no encontrado en la base de datos';
+                        }
+                    } else {
+                        docInput.style.borderColor = '#ccc';
+                        docInput.style.backgroundColor = 'white';
+                        docInput.title = '';
                     }
-                }
-            });
+                });
+            }
         }
 
         // Prevenir que el modal se cierre cuando se hace clic en los inputs
         form.addEventListener('click', (e) => {
             e.stopPropagation();
-        });
-    },
-
-    autofillPersonData(persona) {
-        const fields = [
-            {id: 'nombreCompleto', value: persona.nombreCompleto},
-            {id: 'curso', value: persona.curso},
-            {id: 'telefono', value: persona.telefono}
-        ];
-
-        fields.forEach(({id, value}) => {
-            const input = document.getElementById(id);
-            if (input && value) {
-                input.value = value;
-            }
         });
     }
 };
