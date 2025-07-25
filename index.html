@@ -11,10 +11,10 @@
   <div class="container">
     <h1>Préstamo Equipos de Bilingüismo - I.E. San José Norte</h1>
     <div class="buttons-container">
-      <button class="reset-btn" onclick="resetearMalla()">Restaurar Préstamos de Equipos</button>
+      <button class="reset-btn" onclick="debug.reset()">Restaurar Préstamos de Equipos</button>
     </div>
     <!-- Estado de sincronización -->
-    <div id="sync-status"></div>
+    <div id="sync-status" class="sync-status"></div>
     <!-- Contenedor de los equipos -->
     <div id="malla"></div>
   </div>
@@ -23,7 +23,7 @@
     <div class="modal-content modal-contenido">
       <div class="modal-header">
         <h2>Equipo</h2>
-        <span class="close" onclick="cerrarModal()" title="Cerrar">&times;</span>
+        <span class="close" onclick="modal.close()" title="Cerrar">&times;</span>
       </div>
       <div class="modal-body">
         <p>Complete la información del Equipo:</p>
