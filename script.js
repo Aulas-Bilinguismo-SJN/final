@@ -1,4 +1,3 @@
-// Sistema de Préstamo de Equipos - Versión Corregida
 const CONFIG = {
     URLS: {
         PERSONAS: 'https://docs.google.com/spreadsheets/d/1GU1oKIb9E0Vvwye6zRB2F_fT2jGzRvJ0WoLtWKuio-E/gviz/tq?tqx=out:json&gid=1744634045',
@@ -28,10 +27,9 @@ const CONFIG = {
 const state = {
     personas: new Map(),
     historial: [],
-    equipoSeleccionado: null,
     isLoading: false,
     syncIntervalId: null,
-    
+
     setPersonas(arr) { 
         this.personas.clear(); 
         arr.forEach(p => p.documento && this.personas.set(p.documento, p)); 
@@ -45,7 +43,7 @@ const state = {
     setHistorial(arr) { 
         this.historial = arr.sort((a, b) => b.marcaTemporal - a.marcaTemporal); 
     },
-    
+
     getEquipoState(num) {
         const movs = this.historial.filter(h => h.equipo === num.toString());
         if (!movs.length) return {prestado: false};
@@ -61,107 +59,306 @@ const state = {
 // Utilidades
 const utils = {
     parseGoogleResponse(text) {
-        if (!text.startsWith('/*O_o*/\ngoogle.visualization.Query.setResponse(')) 
-            throw new Error('Formato inválido');
-        const json = text.substring(47).slice(0, -2);
-        const data = JSON.parse(json);
-        if (!data?.table?.rows) throw new Error('Estructura inválida');
-        return data;
+        const cleaned = text.substring(text.indexOf('(')+1, text.lastIndexOf(')'));
+        return JSON.parse(cleaned);
     },
-    
-    getCellValue: c => c && c.v !== null && c.v !== undefined ? c.v.toString().trim() : '',
-    
-    async retry(fn, attempts = CONFIG.RETRY_ATTEMPTS) {
+
+    getCellValue(cell) {
+        return cell && cell.v !== null && cell.v !== undefined ? 
+               (typeof cell.v === 'string' ? cell.v.trim() : String(cell.v)) : '';
+    },
+
+    isValidDoc(doc) {
+        return /^\d+$/.test(doc);
+    },
+
+    formatDateTime(date) {
+        if (!date) return '';
+        const d = new Date(date);
+        return d.toLocaleString('es-ES', {
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit'
+        });
+    },
+
+    async retryAsync(fn, attempts = CONFIG.RETRY_ATTEMPTS) {
         for (let i = 0; i < attempts; i++) {
-            try { return await fn(); }
-            catch (e) {
+            try {
+                return await fn();
+            } catch (e) {
                 if (i === attempts - 1) throw e;
-                await new Promise(r => setTimeout(r, CONFIG.RETRY_DELAY * Math.pow(2, i)));
+                await new Promise(r => setTimeout(r, CONFIG.RETRY_DELAY));
             }
         }
-    },
-    
-    debounce(fn, wait) {
-        let timeout;
-        return (...args) => {
-            clearTimeout(timeout);
-            timeout = setTimeout(() => fn(...args), wait);
-        };
-    },
-    
-    isValidDoc: doc => doc && /^\d+$/.test(doc.trim()) && doc.trim().length >= 6
+    }
 };
 
-// UI Functions
+// UI
 const ui = {
     showSync(msg, type = 'info', autoHide = true) {
-        // Filtrar mensajes de sincronización automática
-        if (msg === 'Sincronizando...' || msg === '✓ Sincronizado') {
-            return;
-        }
-        
         const el = document.getElementById('sync-status');
-        if (!el) return console.log(`SYNC: ${msg} (${type})`);
+        if (!el) return;
         
-        const colors = {success: '#28a745', error: '#dc3545', warning: '#ffc107', info: '#17a2b8'};
         el.textContent = msg;
-        el.className = `sync-status ${type}`;
-        el.style.color = colors[type];
-        el.style.opacity = '1';
+        el.className = `sync-status sync-${type}`;
+        el.style.display = 'block';
         
-        if (autoHide && (type === 'success' || type === 'error')) {
-            setTimeout(() => {
-                el.style.opacity = '0';
-                setTimeout(() => { el.textContent = ''; el.className = 'sync-status'; }, 300);
-            }, 4000);
-        }
-    },
-    
-    showModal(show = true) {
-        const modal = document.getElementById('modalMetodos');
-        if (!modal) return;
-        
-        modal.style.display = show ? 'block' : 'none';
-        document.body.style.overflow = show ? 'hidden' : '';
-        if (!show) state.equipoSeleccionado = null;
-        if (show) {
-            const input = modal.querySelector('input, button, textarea, select');
-            if (input) input.focus();
-        }
-    },
-    
-    validateDoc: utils.debounce(function(doc) {
-        const status = document.getElementById('documento-status');
-        const btn = document.getElementById('btn-registrar');
-        if (!status || !btn) return;
-        
-        if (!doc) {
-            status.textContent = ''; status.className = '';
-            btn.disabled = false; btn.style.opacity = '1';
-            return;
-        }
-        
-        if (!utils.isValidDoc(doc)) {
-            status.textContent = '⚠ Formato inválido';
-            status.className = 'warning'; status.style.color = '#ffc107';
-            btn.disabled = true; btn.style.opacity = '0.6';
-            return;
-        }
-        
-        const persona = state.findPersona(doc);
-        if (persona) {
-            status.textContent = `✓ ${persona.nombreCompleto} - ${persona.curso}`;
-            status.className = 'success'; status.style.color = '#28a745';
-            btn.disabled = false; btn.style.opacity = '1';
-        } else {
-            status.textContent = `✗ No encontrado (${state.personas.size} registros)`;
-            status.className = 'error'; status.style.color = '#dc3545';
-            btn.disabled = true; btn.style.opacity = '0.6';
-        }
-    }, 300)
+        if (autoHide) setTimeout(() => el.style.display = 'none', 3000);
+    }
 };
 
-// Carga de datos
+// Modal mejorado con soporte completo para teclado
+const modal = {
+    el: null,
+    currentEquipo: null,
+    
+    init() {
+        this.el = document.getElementById('modalMetodos');
+        
+        // Eventos del modal
+        this.el.addEventListener('click', (e) => {
+            if (e.target === this.el) this.close();
+        });
+        
+        // Soporte para tecla Escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this.isOpen()) {
+                this.close();
+            }
+        });
+    },
+
+    isOpen() {
+        return this.el && this.el.style.display === 'block';
+    },
+
+    open(equipoNum) {
+        if (!this.el) return;
+        
+        this.currentEquipo = equipoNum;
+        this.el.style.display = 'block';
+        
+        // Actualizar título
+        const header = this.el.querySelector('.modal-header h2');
+        if (header) header.textContent = `Equipo ${equipoNum}`;
+        
+        this.renderContent();
+        
+        // Establecer foco en el primer input del modal
+        setTimeout(() => {
+            const firstInput = this.el.querySelector('input, textarea, select');
+            if (firstInput) {
+                firstInput.focus();
+            }
+        }, 100);
+    },
+
+    close() {
+        if (this.el) {
+            this.el.style.display = 'none';
+            this.currentEquipo = null;
+        }
+    },
+
+    renderContent() {
+        const container = document.getElementById('listaMetodos');
+        if (!container) return;
+
+        const estado = state.getEquipoState(this.currentEquipo);
+        const isPrestado = estado.prestado;
+
+        container.innerHTML = `
+            <form id="equipmentForm" style="display: flex; flex-direction: column; gap: 15px;">
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <label for="documento" style="font-weight: bold;">Documento:</label>
+                    <input type="text" 
+                           id="documento" 
+                           name="documento" 
+                           required 
+                           autocomplete="off"
+                           style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;"
+                           placeholder="Ingrese el documento">
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <label for="nombreCompleto" style="font-weight: bold;">Nombre Completo:</label>
+                    <input type="text" 
+                           id="nombreCompleto" 
+                           name="nombreCompleto" 
+                           required 
+                           autocomplete="off"
+                           style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;"
+                           placeholder="Nombre completo del estudiante">
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <label for="curso" style="font-weight: bold;">Curso:</label>
+                    <input type="text" 
+                           id="curso" 
+                           name="curso" 
+                           required 
+                           autocomplete="off"
+                           style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;"
+                           placeholder="Ejemplo: 10A, 11B">
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <label for="telefono" style="font-weight: bold;">Teléfono:</label>
+                    <input type="tel" 
+                           id="telefono" 
+                           name="telefono" 
+                           autocomplete="off"
+                           style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;"
+                           placeholder="Número de teléfono">
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <label for="profesorEncargado" style="font-weight: bold;">Profesor Encargado:</label>
+                    <input type="text" 
+                           id="profesorEncargado" 
+                           name="profesorEncargado" 
+                           required 
+                           autocomplete="off"
+                           style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;"
+                           placeholder="Nombre del profesor">
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <label for="materia" style="font-weight: bold;">Materia:</label>
+                    <input type="text" 
+                           id="materia" 
+                           name="materia" 
+                           required 
+                           autocomplete="off"
+                           style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;"
+                           placeholder="Materia para la cual se usa">
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <label for="tipo" style="font-weight: bold;">Tipo de Movimiento:</label>
+                    <select id="tipo" 
+                            name="tipo" 
+                            required 
+                            style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;">
+                        <option value="">Seleccione una opción</option>
+                        <option value="Préstamo" ${!isPrestado ? 'selected' : ''}>Préstamo</option>
+                        <option value="Devolución" ${isPrestado ? 'selected' : ''}>Devolución</option>
+                    </select>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <label for="comentario" style="font-weight: bold;">Comentario (opcional):</label>
+                    <textarea id="comentario" 
+                              name="comentario" 
+                              rows="3" 
+                              style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; resize: vertical;"
+                              placeholder="Observaciones adicionales"></textarea>
+                </div>
+
+                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                    <button type="button" 
+                            onclick="modal.close()" 
+                            style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        Cancelar
+                    </button>
+                    <button type="submit" 
+                            style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        Registrar
+                    </button>
+                </div>
+            </form>
+        `;
+
+        // Configurar eventos del formulario
+        this.setupFormEvents();
+        
+        // Si el equipo está prestado, prellenar con datos del último movimiento
+        if (isPrestado && estado.ultimoMovimiento) {
+            this.fillFormWithLastMovement(estado.ultimoMovimiento);
+        }
+    },
+
+    fillFormWithLastMovement(movimiento) {
+        const fields = ['documento', 'nombreCompleto', 'curso', 'telefono', 'profesorEncargado', 'materia'];
+        fields.forEach(field => {
+            const input = document.getElementById(field);
+            if (input && movimiento[field]) {
+                input.value = movimiento[field];
+            }
+        });
+    },
+
+    setupFormEvents() {
+        const form = document.getElementById('equipmentForm');
+        if (!form) return;
+
+        // Evento de envío del formulario
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData);
+            data.equipo = this.currentEquipo;
+            data.marcaTemporal = new Date().toISOString();
+
+            try {
+                const submitBtn = form.querySelector('button[type="submit"]');
+                const originalText = submitBtn.textContent;
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Enviando...';
+
+                await forms.submit(data);
+                
+                ui.showSync('Registro exitoso', 'success');
+                this.close();
+                
+                // Actualizar estado local
+                state.addHistorial(data);
+                grid.updateAll();
+                
+            } catch (error) {
+                console.error('Error al enviar:', error);
+                ui.showSync('Error al registrar', 'error');
+            }
+        });
+
+        // Evento de búsqueda automática por documento
+        const docInput = document.getElementById('documento');
+        if (docInput) {
+            docInput.addEventListener('input', (e) => {
+                const doc = e.target.value.trim();
+                if (doc && utils.isValidDoc(doc)) {
+                    const persona = state.findPersona(doc);
+                    if (persona) {
+                        this.autofillPersonData(persona);
+                    }
+                }
+            });
+        }
+
+        // Prevenir que el modal se cierre cuando se hace clic en los inputs
+        form.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+    },
+
+    autofillPersonData(persona) {
+        const fields = [
+            {id: 'nombreCompleto', value: persona.nombreCompleto},
+            {id: 'curso', value: persona.curso},
+            {id: 'telefono', value: persona.telefono}
+        ];
+
+        fields.forEach(({id, value}) => {
+            const input = document.getElementById(id);
+            if (input && value) {
+                input.value = value;
+            }
+        });
+    }
+};
+
+// Cargador de datos
 const loader = {
     async loadPersonas() {
         const resp = await fetch(CONFIG.URLS.PERSONAS);
@@ -180,7 +377,7 @@ const loader = {
         state.setPersonas(personas);
         console.log(`✓ Personas: ${state.personas.size}`);
     },
-    
+
     async loadHistorial() {
         const resp = await fetch(CONFIG.URLS.HISTORIAL);
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -188,7 +385,7 @@ const loader = {
         const data = utils.parseGoogleResponse(await resp.text());
         const historial = data.table.rows.slice(1)
             .map(row => ({
-                marcaTemporal: row.c[0]?.v ? new Date(row.c[0].v) : new Date(),
+                marcaTemporal: new Date(utils.getCellValue(row.c[0]) || Date.now()),
                 equipo: utils.getCellValue(row.c[1]),
                 nombreCompleto: utils.getCellValue(row.c[2]),
                 documento: utils.getCellValue(row.c[3]),
@@ -199,33 +396,36 @@ const loader = {
                 tipo: utils.getCellValue(row.c[8]),
                 comentario: utils.getCellValue(row.c[9])
             }))
-            .filter(h => h.equipo && ['Préstamo', 'Devolución'].includes(h.tipo));
+            .filter(h => h.equipo && h.tipo);
         
         state.setHistorial(historial);
-        console.log(`✓ Historial: ${historial.length}`);
+        console.log(`✓ Historial: ${state.historial.length}`);
     },
-    
+
     async loadAll() {
         if (state.isLoading) return;
         
         state.isLoading = true;
         ui.showSync('Sincronizando...', 'info', false);
-        
+
         try {
-            await utils.retry(() => Promise.all([this.loadPersonas(), this.loadHistorial()]));
+            await Promise.all([
+                utils.retryAsync(() => this.loadPersonas()),
+                utils.retryAsync(() => this.loadHistorial())
+            ]);
+            
             grid.updateAll();
-            ui.showSync('✓ Sincronizado', 'success');
+            ui.showSync('Sincronizado', 'success');
         } catch (e) {
-            console.error('Error:', e);
-            ui.showSync('⚠ Error - usando datos locales', 'warning');
-            try { grid.updateAll(); } catch {}
+            console.error('Error en sincronización:', e);
+            ui.showSync('Error de sincronización', 'error');
         } finally {
             state.isLoading = false;
         }
     }
 };
 
-// Malla de equipos
+// Grid de equipos
 const grid = {
     create() {
         const malla = document.getElementById('malla');
@@ -233,7 +433,7 @@ const grid = {
             console.error('No se encontró el elemento con id "malla"');
             return;
         }
-        
+
         console.log('Creando malla de equipos...');
         const frag = document.createDocumentFragment();
         
@@ -241,39 +441,39 @@ const grid = {
             const div = document.createElement('div');
             div.className = 'ramo';
             div.dataset.equipo = i;
-            div.style.cssText = 'cursor:pointer;transition:all 0.2s;user-select:none';
+            
             div.onclick = () => modal.open(i);
             
             div.onmouseenter = function() {
-                if (!this.classList.contains('equipo-prestado')) {
-                    this.style.transform = 'scale(1.02)';
-                    this.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
-                }
+                this.style.transform = 'scale(1.05)';
+                this.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
             };
+            
             div.onmouseleave = function() {
                 this.style.transform = this.style.boxShadow = '';
             };
-            
+
             div.innerHTML = `
                 <div style="font-weight:bold">Equipo ${i}</div>
                 <div class="estado-equipo" style="font-size:0.9em;margin-top:5px">Disponible</div>
             `;
             frag.appendChild(div);
         }
-        
+
         malla.innerHTML = '';
         malla.appendChild(frag);
         console.log(`✓ Creados ${CONFIG.TOTAL_EQUIPOS} equipos`);
     },
-    
+
     updateAll() {
-        document.querySelectorAll('[data-equipo]').forEach(el => {
-            const num = el.dataset.equipo;
-            const estado = state.getEquipoState(num);
-            const statusEl = el.querySelector('.estado-equipo');
-            
-            el.classList.remove('equipo-prestado', 'equipo-disponible');
-            
+        for (let i = 1; i <= CONFIG.TOTAL_EQUIPOS; i++) {
+            const el = document.querySelector(`[data-equipo="${i}"]`);
+            const statusEl = el?.querySelector('.estado-equipo');
+            if (!el) continue;
+
+            const estado = state.getEquipoState(i);
+            el.className = 'ramo';
+
             if (estado.prestado) {
                 el.classList.add('equipo-prestado');
                 Object.assign(el.style, {
@@ -291,335 +491,61 @@ const grid = {
                 });
                 if (statusEl) statusEl.textContent = 'Disponible';
             }
+        }
+        console.log('✓ Estados actualizados');
+    }
+};
+
+// Sistema de formularios
+const forms = {
+    async submit(data) {
+        const formData = new URLSearchParams();
+        
+        Object.entries(CONFIG.FORM_ENTRIES).forEach(([key, entry]) => {
+            if (data[key]) formData.append(entry, data[key]);
         });
-    }
-};
 
-// Modal de equipos
-const modal = {
-    open(num) {
-        state.equipoSeleccionado = num;
-        const estado = state.getEquipoState(num.toString());
-        
-        const header = document.querySelector('#modalMetodos .modal-header h2');
-        if (header) header.textContent = `Equipo ${num}`;
-        
-        estado.prestado ? this.showReturn(estado.ultimoMovimiento) : this.showLoan();
-        ui.showModal(true);
-    },
-    
-    showLoan() {
-        const lista = document.getElementById('listaMetodos');
-        if (!lista) return;
-        
-        lista.innerHTML = `
-            <div class="formulario-prestamo" style="padding:20px">
-                <div style="margin-bottom:15px">
-                    <label for="documento" style="display:block;margin-bottom:5px;font-weight:bold">Documento: <span style="color:#dc3545">*</span></label>
-                    <input type="text" 
-                           id="documento" 
-                           name="documento"
-                           placeholder="Ej: 12345678" 
-                           style="width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;font-size:16px;box-sizing:border-box;background:white;color:black;outline:none" 
-                           autocomplete="off" 
-                           inputmode="numeric" 
-                           pattern="[0-9]*"
-                           maxlength="15"/>
-                    <small id="documento-status" style="display:block;margin-top:5px;font-size:0.85em"></small>
-                </div>
-                <div style="margin-bottom:15px">
-                    <label for="profesor" style="display:block;margin-bottom:5px;font-weight:bold">Profesor(a): <span style="color:#dc3545">*</span></label>
-                    <input type="text" 
-                           id="profesor" 
-                           name="profesor"
-                           placeholder="Nombre completo" 
-                           style="width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;font-size:16px;box-sizing:border-box;background:white;color:black;outline:none"
-                           maxlength="100"/>
-                </div>
-                <div style="margin-bottom:20px">
-                    <label for="asignatura" style="display:block;margin-bottom:5px;font-weight:bold">Asignatura: <span style="color:#dc3545">*</span></label>
-                    <input type="text" 
-                           id="asignatura" 
-                           name="asignatura"
-                           placeholder="Nombre materia" 
-                           style="width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;font-size:16px;box-sizing:border-box;background:white;color:black;outline:none"
-                           maxlength="100"/>
-                </div>
-                <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:30px">
-                    <button id="btn-registrar" type="button" style="background:#007bff;color:white;border:none;padding:12px 24px;border-radius:4px;cursor:pointer;font-size:16px">Registrar Préstamo</button>
-                    <button type="button" style="background:#6c757d;color:white;border:none;padding:12px 24px;border-radius:4px;cursor:pointer;font-size:16px">Cancelar</button>
-                </div>
-            </div>`;
-        
-        // Configurar eventos después de crear el DOM
-        setTimeout(() => {
-            const docInput = document.getElementById('documento');
-            const profInput = document.getElementById('profesor');
-            const asigInput = document.getElementById('asignatura');
-            const btnRegistrar = document.getElementById('btn-registrar');
-            const btnCancelar = lista.querySelector('button[type="button"]:last-child');
-            
-            // Configurar campo documento
-            if (docInput) {
-                docInput.addEventListener('input', function(e) {
-                    // Permitir solo números
-                    this.value = this.value.replace(/[^0-9]/g, '');
-                    ui.validateDoc(this.value.trim());
-                });
-                
-                docInput.addEventListener('keydown', function(e) {
-                    // Permitir teclas de control
-                    const allowedKeys = ['Backspace', 'Delete', 'Tab', 'Enter', 'ArrowLeft', 'ArrowRight', 'Home', 'End'];
-                    if (allowedKeys.includes(e.key) || (e.key >= '0' && e.key <= '9')) {
-                        return true;
-                    }
-                    e.preventDefault();
-                });
-                
-                // Enfocar el campo
-                docInput.focus();
-                docInput.select();
-            }
-            
-            // Configurar botones
-            if (btnRegistrar) {
-                btnRegistrar.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    loan.process();
-                });
-            }
-            
-            if (btnCancelar) {
-                btnCancelar.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    modal.close();
-                });
-            }
-            
-            // Permitir Enter para enviar formulario
-            const form = document.querySelector('.formulario-prestamo');
-            if (form) {
-                form.addEventListener('keypress', function(e) {
-                    if (e.key === 'Enter' && !e.target.matches('textarea')) {
-                        e.preventDefault();
-                        loan.process();
-                    }
-                });
-            }
-            
-            console.log('✓ Formulario de préstamo configurado');
-        }, 150);
-    },
-    
-    showReturn(ultimo) {
-        const lista = document.getElementById('listaMetodos');
-        if (!lista) return;
-        
-        lista.innerHTML = `
-            <div style="padding:20px">
-                <div style="background:#f8f9fa;padding:20px;border-radius:8px;margin-bottom:20px;border-left:4px solid #007bff">
-                    <h4 style="margin-top:0;color:#495057;margin-bottom:15px">📋 Información del Préstamo</h4>
-                    <div style="display:grid;gap:8px">
-                        <p style="margin:0"><strong>Nombre:</strong> ${ultimo.nombreCompleto}</p>
-                        <p style="margin:0"><strong>Documento:</strong> ${ultimo.documento}</p>
-                        <p style="margin:0"><strong>Curso:</strong> ${ultimo.curso}</p>
-                        <p style="margin:0"><strong>Profesor:</strong> ${ultimo.profesorEncargado}</p>
-                        <p style="margin:0"><strong>Asignatura:</strong> ${ultimo.materia}</p>
-                        <p style="margin:0"><strong>Prestado:</strong> ${ultimo.marcaTemporal.toLocaleString()}</p>
-                    </div>
-                </div>
-                <div style="margin-bottom:20px">
-                    <label for="comentario-devolucion" style="display:block;margin-bottom:8px;font-weight:bold">💬 Comentarios (opcional):</label>
-                    <textarea id="comentario-devolucion" 
-                              name="comentario" 
-                              placeholder="Estado del equipo, daños, observaciones..." 
-                              style="width:100%;padding:12px;border:1px solid #ddd;border-radius:4px;min-height:100px;resize:vertical;font-family:inherit;font-size:14px;box-sizing:border-box;background:white;color:black;outline:none"
-                              maxlength="500"></textarea>
-                </div>
-                <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:30px">
-                    <button id="btn-devolver" type="button" style="background:#28a745;color:white;border:none;padding:12px 24px;border-radius:4px;cursor:pointer;font-size:16px">✓ Registrar Devolución</button>
-                    <button id="btn-cancelar-dev" type="button" style="background:#6c757d;color:white;border:none;padding:12px 24px;border-radius:4px;cursor:pointer;font-size:16px">Cancelar</button>
-                </div>
-            </div>`;
-        
-        // Configurar eventos después de crear el DOM
-        setTimeout(() => {
-            const comentarioTextarea = document.getElementById('comentario-devolucion');
-            const btnDevolver = document.getElementById('btn-devolver');
-            const btnCancelar = document.getElementById('btn-cancelar-dev');
-            
-            // Configurar textarea
-            if (comentarioTextarea) {
-                comentarioTextarea.focus();
-            }
-            
-            // Configurar botones
-            if (btnDevolver) {
-                btnDevolver.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    returnProc.process();
-                });
-            }
-            
-            if (btnCancelar) {
-                btnCancelar.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    modal.close();
-                });
-            }
-            
-            console.log('✓ Formulario de devolución configurado');
-        }, 150);
-    },
-    
-    close() { ui.showModal(false); }
-};
-
-// Procesador de préstamos
-const loan = {
-    async process() {
-        if (state.isLoading) return ui.showSync('Operación en progreso...', 'warning');
-        
-        const doc = document.getElementById('documento')?.value.trim();
-        const prof = document.getElementById('profesor')?.value.trim();
-        const asig = document.getElementById('asignatura')?.value.trim();
-        
-        if (!doc || !prof || !asig) return alert('Todos los campos son requeridos');
-        if (!utils.isValidDoc(doc)) return alert('Documento inválido');
-        if (prof.length < 3) return alert('Nombre de profesor muy corto');
-        if (asig.length < 2) return alert('Nombre de asignatura muy corto');
-        
-        const persona = state.findPersona(doc);
-        if (!persona) return alert(`Documento "${doc}" no registrado.\nPersonas: ${state.personas.size}`);
-        
-        const registro = {
-            equipo: state.equipoSeleccionado.toString(),
-            nombreCompleto: persona.nombreCompleto,
-            documento: persona.documento,
-            curso: persona.curso,
-            telefono: persona.telefono,
-            profesorEncargado: prof,
-            materia: asig,
-            tipo: 'Préstamo',
-            comentario: ''
-        };
-        
-        try { await this.submit(registro); }
-        catch (e) { alert('Error registrando préstamo. Verifique conexión.'); }
-    },
-    
-    async submit(reg) {
-        ui.showSync('Registrando préstamo...', 'info', false);
-        
-        const mov = {marcaTemporal: new Date(), ...reg};
-        state.addHistorial(mov);
-        grid.updateAll();
-        modal.close();
-        
-        try {
-            await form.submit(reg);
-            ui.showSync('✓ Préstamo registrado', 'success');
-            setTimeout(() => loader.loadAll(), CONFIG.FORM_DELAY);
-        } catch (e) {
-            state.removeHistorial(mov);
-            grid.updateAll();
-            throw e;
-        }
-    }
-};
-
-// Procesador de devoluciones
-const returnProc = {
-    async process() {
-        if (state.isLoading) return ui.showSync('Operación en progreso...', 'warning');
-        
-        const estado = state.getEquipoState(state.equipoSeleccionado.toString());
-        if (!estado.ultimoMovimiento) return alert('Error: No hay información del préstamo');
-        
-        const comentario = document.getElementById('comentario-devolucion')?.value.trim() || '';
-        const ultimo = estado.ultimoMovimiento;
-        
-        const registro = {
-            equipo: state.equipoSeleccionado.toString(),
-            nombreCompleto: ultimo.nombreCompleto,
-            documento: ultimo.documento,
-            curso: ultimo.curso,
-            telefono: ultimo.telefono,
-            profesorEncargado: ultimo.profesorEncargado,
-            materia: ultimo.materia,
-            tipo: 'Devolución',
-            comentario
-        };
-        
-        try { await this.submit(registro); }
-        catch (e) { alert('Error registrando devolución. Verifique conexión.'); }
-    },
-    
-    async submit(reg) {
-        ui.showSync('Registrando devolución...', 'info', false);
-        
-        const mov = {marcaTemporal: new Date(), ...reg};
-        state.addHistorial(mov);
-        grid.updateAll();
-        modal.close();
-        
-        try {
-            await form.submit(reg);
-            ui.showSync('✓ Devolución registrada', 'success');
-            setTimeout(() => loader.loadAll(), CONFIG.FORM_DELAY);
-        } catch (e) {
-            state.removeHistorial(mov);
-            grid.updateAll();
-            throw e;
-        }
-    }
-};
-
-// Envío de formularios
-const form = {
-    async submit(reg) {
-        const formData = new FormData();
-        Object.entries(CONFIG.FORM_ENTRIES).forEach(([key, entryId]) => {
-            formData.append(entryId, reg[key] || '');
+        const resp = await fetch(CONFIG.URLS.GOOGLE_FORM, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: formData,
+            mode: 'no-cors'
         });
-        
-        try {
-            await fetch(CONFIG.URLS.GOOGLE_FORM, {method: 'POST', mode: 'no-cors', body: formData});
-            console.log('✓ Enviado a Google Forms');
-        } catch (e) {
-            console.error('Error:', e);
-            throw new Error('No se pudo enviar');
-        }
+
+        await new Promise(resolve => setTimeout(resolve, CONFIG.FORM_DELAY));
+        return true;
     }
 };
 
-// Event Manager
+// Eventos globales
 const events = {
     init() {
-        document.onkeydown = e => e.key === 'Escape' && modal.close();
-        window.onclick = e => e.target === document.getElementById('modalMetodos') && modal.close();
-        window.onfocus = () => !state.isLoading && loader.loadAll();
-        window.onerror = e => ui.showSync('Error inesperado', 'error');
-        window.onunhandledrejection = () => ui.showSync('Error de conexión', 'warning');
+        modal.init();
     },
-    
+
     setupSync() {
-        if (state.syncIntervalId) clearInterval(state.syncIntervalId);
         state.syncIntervalId = setInterval(() => {
-            if (!state.isLoading && document.visibilityState === 'visible') loader.loadAll();
+            if (!state.isLoading) loader.loadAll();
         }, CONFIG.SYNC_INTERVAL);
     }
 };
 
-// Debug functions
+// Debug
 const debug = {
-    personas: () => console.table(Array.from(state.personas.values()).slice(0, 10)),
-    historial: () => console.table(state.historial.slice(0, 10)),
-    equipos: () => {
+    state: () => state,
+    personas: () => console.table([...state.personas.values()]),
+    historial: () => console.table(state.historial),
+    prestados() {
         const prestados = [];
         for (let i = 1; i <= CONFIG.TOTAL_EQUIPOS; i++) {
-            const est = state.getEquipoState(i.toString());
-            if (est.prestado) prestados.push({equipo: i, usuario: est.nombreCompleto});
+            const estado = state.getEquipoState(i);
+            if (estado.prestado) {
+                prestados.push({
+                    equipo: i,
+                    prestadoA: estado.nombreCompleto,
+                    fecha: utils.formatDateTime(estado.ultimoMovimiento?.marcaTemporal)
+                });
+            }
         }
         console.table(prestados);
     },
@@ -640,7 +566,7 @@ const app = {
         try {
             const missing = ['malla', 'modalMetodos'].filter(id => !document.getElementById(id));
             if (missing.length) throw new Error(`Elementos faltantes: ${missing.join(', ')}`);
-            
+
             console.log('✓ Elementos encontrados');
             
             grid.create();
@@ -654,7 +580,7 @@ const app = {
                 console.warn('No se pudieron cargar datos iniciales:', e);
                 ui.showSync('Sin conexión - modo offline', 'warning');
             }
-            
+
             window.debug = debug;
             console.log('✅ Sistema inicializado correctamente');
         } catch (e) {
@@ -676,14 +602,11 @@ window.addEventListener('beforeunload', () => {
 
 // API pública
 window.EquipmentLoanSystem = {
+    state,
+    modal,
     debug,
-    forceSync: () => loader.loadAll(),
-    getStats: () => ({
-        personas: state.personas.size,
-        historial: state.historial.length,
-        equiposPrestados: Array.from({length: CONFIG.TOTAL_EQUIPOS}, (_, i) => i + 1)
-            .filter(i => state.getEquipoState(i.toString()).prestado).length
-    })
+    reload: () => location.reload(),
+    version: '2.1.0'
 };
 
-console.log('📦 Sistema de Préstamo v2.1 - Corregido');
+console.log('📦 Sistema de Préstamo v2.1 - Con soporte completo de teclado');
