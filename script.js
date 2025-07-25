@@ -597,38 +597,38 @@ const grid = {
             return;
         }
 
+        console.log('Creando grid de equipos...');
         const frag = document.createDocumentFragment();
         
         for (let i = 1; i <= CONFIG.TOTAL_EQUIPOS; i++) {
             const div = document.createElement('div');
-            div.className = 'ramo';
+            div.className = 'ramo equipo-disponible';
             div.dataset.equipo = i;
             
+            // Event listeners
             div.onclick = () => modal.open(i);
             
-            // Effectos hover optimizados
-            div.onmouseenter = function() {
-                this.style.transform = 'scale(1.05)';
-                this.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
-                this.style.transition = 'all 0.2s ease';
-            };
-            
-            div.onmouseleave = function() {
-                this.style.transform = '';
-                this.style.boxShadow = '';
-            };
-
+            // Contenido del equipo
             div.innerHTML = `
-                <div style="font-weight:bold; margin-bottom: 5px;">Equipo ${i}</div>
-                <div class="estado-equipo" style="font-size:0.9em; color: #666;">Disponible</div>
+                <div style="font-weight: bold; margin-bottom: 8px; font-size: 16px;">Equipo ${i}</div>
+                <div class="estado-equipo">Disponible</div>
             `;
             
             frag.appendChild(div);
         }
 
+        // Limpiar contenedor y agregar elementos
         malla.innerHTML = '';
         malla.appendChild(frag);
-        console.log(`✓ Grid creado: ${CONFIG.TOTAL_EQUIPOS} equipos`);
+        
+        // Verificar que se crearon correctamente
+        const equiposCreados = malla.querySelectorAll('.ramo').length;
+        console.log(`✓ Grid creado: ${equiposCreados}/${CONFIG.TOTAL_EQUIPOS} equipos`);
+        
+        // Forzar repaint si es necesario
+        setTimeout(() => {
+            malla.style.display = 'grid';
+        }, 100);
     },
 
     updateAll() {
@@ -641,33 +641,22 @@ const grid = {
 
             const estado = state.getEquipoState(i);
             
-            // Reset classes
+            // Reset classes y aplicar nueva clase
             el.className = 'ramo';
             
             if (estado.prestado) {
                 el.classList.add('equipo-prestado');
-                Object.assign(el.style, {
-                    backgroundColor: '#d4edda',
-                    borderColor: '#28a745',
-                    color: '#155724'
-                });
                 statusEl.textContent = `Prestado a: ${estado.nombreCompleto}`;
-                statusEl.style.color = '#155724';
                 updates.push(`Equipo ${i}: ${estado.nombreCompleto}`);
             } else {
                 el.classList.add('equipo-disponible');
-                Object.assign(el.style, {
-                    backgroundColor: '#f8f9fa',
-                    borderColor: '#dee2e6',
-                    color: '#495057'
-                });
                 statusEl.textContent = 'Disponible';
-                statusEl.style.color = '#666';
             }
         }
         
+        console.log(`✓ Estados actualizados: ${updates.length} equipos prestados`);
         if (updates.length > 0) {
-            console.log('✓ Estados actualizados:', updates.length, 'cambios');
+            console.log('Préstamos activos:', updates);
         }
     }
 };
@@ -777,6 +766,51 @@ const debug = {
             grid.updateAll();
             console.log('Vista reseteada');
         }
+    },
+
+    // Nueva función de diagnóstico
+    diagnose: () => {
+        console.log('🔍 DIAGNÓSTICO DEL SISTEMA');
+        console.log('========================');
+        
+        // Verificar DOM
+        const malla = document.getElementById('malla');
+        const modal = document.getElementById('modalMetodos');
+        console.log(`DOM - Malla: ${!!malla}, Modal: ${!!modal}`);
+        
+        // Verificar equipos creados
+        const equipos = malla ? malla.querySelectorAll('.ramo').length : 0;
+        console.log(`Equipos creados: ${equipos}/${CONFIG.TOTAL_EQUIPOS}`);
+        
+        // Verificar datos
+        console.log(`Personas cargadas: ${state.personas.size}`);
+        console.log(`Registros de historial: ${state.historial.length}`);
+        
+        // Verificar conexión
+        console.log(`Última sincronización: ${state.lastSyncTime ? new Date(state.lastSyncTime).toLocaleString() : 'Nunca'}`);
+        console.log(`Sincronización activa: ${!!state.syncIntervalId}`);
+        
+        // Verificar equipos prestados
+        const prestados = debug.prestados();
+        console.log(`Equipos prestados: ${prestados}`);
+        
+        // Test de personas aleatorias
+        if (state.personas.size > 0) {
+            const docs = [...state.personas.keys()];
+            const randomDoc = docs[Math.floor(Math.random() * docs.length)];
+            const persona = state.findPersona(randomDoc);
+            console.log(`Test persona aleatoria:`, persona);
+        }
+        
+        console.log('========================');
+        return {
+            dom: { malla: !!malla, modal: !!modal },
+            equipos: equipos,
+            personas: state.personas.size,
+            historial: state.historial.length,
+            prestados: prestados,
+            sync: !!state.syncIntervalId
+        };
     }
 };
 
