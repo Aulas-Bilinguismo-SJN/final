@@ -316,36 +316,99 @@ const modal = {
             <div class="formulario-prestamo" style="padding:20px">
                 <div style="margin-bottom:15px">
                     <label for="documento" style="display:block;margin-bottom:5px;font-weight:bold">Documento: <span style="color:#dc3545">*</span></label>
-                    <input type="text" id="documento" placeholder="Ej: 12345678" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;font-size:16px" autocomplete="off" inputmode="numeric" pattern="[0-9]*"/>
+                    <input type="text" 
+                           id="documento" 
+                           name="documento"
+                           placeholder="Ej: 12345678" 
+                           style="width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;font-size:16px;box-sizing:border-box;background:white;color:black;outline:none" 
+                           autocomplete="off" 
+                           inputmode="numeric" 
+                           pattern="[0-9]*"
+                           maxlength="15"/>
                     <small id="documento-status" style="display:block;margin-top:5px;font-size:0.85em"></small>
                 </div>
                 <div style="margin-bottom:15px">
                     <label for="profesor" style="display:block;margin-bottom:5px;font-weight:bold">Profesor(a): <span style="color:#dc3545">*</span></label>
-                    <input type="text" id="profesor" placeholder="Nombre completo" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;font-size:16px"/>
+                    <input type="text" 
+                           id="profesor" 
+                           name="profesor"
+                           placeholder="Nombre completo" 
+                           style="width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;font-size:16px;box-sizing:border-box;background:white;color:black;outline:none"
+                           maxlength="100"/>
                 </div>
                 <div style="margin-bottom:20px">
                     <label for="asignatura" style="display:block;margin-bottom:5px;font-weight:bold">Asignatura: <span style="color:#dc3545">*</span></label>
-                    <input type="text" id="asignatura" placeholder="Nombre materia" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;font-size:16px"/>
+                    <input type="text" 
+                           id="asignatura" 
+                           name="asignatura"
+                           placeholder="Nombre materia" 
+                           style="width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;font-size:16px;box-sizing:border-box;background:white;color:black;outline:none"
+                           maxlength="100"/>
                 </div>
                 <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:30px">
-                    <button id="btn-registrar" onclick="loan.process()" style="background:#007bff;color:white;border:none;padding:12px 24px;border-radius:4px;cursor:pointer;font-size:16px">Registrar Préstamo</button>
-                    <button onclick="modal.close()" style="background:#6c757d;color:white;border:none;padding:12px 24px;border-radius:4px;cursor:pointer;font-size:16px">Cancelar</button>
+                    <button id="btn-registrar" type="button" style="background:#007bff;color:white;border:none;padding:12px 24px;border-radius:4px;cursor:pointer;font-size:16px">Registrar Préstamo</button>
+                    <button type="button" style="background:#6c757d;color:white;border:none;padding:12px 24px;border-radius:4px;cursor:pointer;font-size:16px">Cancelar</button>
                 </div>
             </div>`;
         
+        // Configurar eventos después de crear el DOM
         setTimeout(() => {
             const docInput = document.getElementById('documento');
+            const profInput = document.getElementById('profesor');
+            const asigInput = document.getElementById('asignatura');
+            const btnRegistrar = document.getElementById('btn-registrar');
+            const btnCancelar = lista.querySelector('button[type="button"]:last-child');
+            
+            // Configurar campo documento
             if (docInput) {
+                docInput.addEventListener('input', function(e) {
+                    // Permitir solo números
+                    this.value = this.value.replace(/[^0-9]/g, '');
+                    ui.validateDoc(this.value.trim());
+                });
+                
+                docInput.addEventListener('keydown', function(e) {
+                    // Permitir teclas de control
+                    const allowedKeys = ['Backspace', 'Delete', 'Tab', 'Enter', 'ArrowLeft', 'ArrowRight', 'Home', 'End'];
+                    if (allowedKeys.includes(e.key) || (e.key >= '0' && e.key <= '9')) {
+                        return true;
+                    }
+                    e.preventDefault();
+                });
+                
+                // Enfocar el campo
                 docInput.focus();
-                docInput.oninput = e => ui.validateDoc(e.target.value.trim());
-                docInput.onkeypress = e => {
-                    if (!/\d/.test(e.key) && !['Backspace', 'Delete', 'Tab', 'Enter'].includes(e.key)) e.preventDefault();
-                };
+                docInput.select();
             }
             
+            // Configurar botones
+            if (btnRegistrar) {
+                btnRegistrar.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    loan.process();
+                });
+            }
+            
+            if (btnCancelar) {
+                btnCancelar.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    modal.close();
+                });
+            }
+            
+            // Permitir Enter para enviar formulario
             const form = document.querySelector('.formulario-prestamo');
-            if (form) form.onkeypress = e => e.key === 'Enter' && !e.target.matches('textarea') && (e.preventDefault(), loan.process());
-        }, 100);
+            if (form) {
+                form.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter' && !e.target.matches('textarea')) {
+                        e.preventDefault();
+                        loan.process();
+                    }
+                });
+            }
+            
+            console.log('✓ Formulario de préstamo configurado');
+        }, 150);
     },
     
     showReturn(ultimo) {
@@ -367,13 +430,46 @@ const modal = {
                 </div>
                 <div style="margin-bottom:20px">
                     <label for="comentario-devolucion" style="display:block;margin-bottom:8px;font-weight:bold">💬 Comentarios (opcional):</label>
-                    <textarea id="comentario-devolucion" placeholder="Estado del equipo, daños, observaciones..." style="width:100%;padding:12px;border:1px solid #ddd;border-radius:4px;min-height:100px;resize:vertical;font-family:inherit;font-size:14px"></textarea>
+                    <textarea id="comentario-devolucion" 
+                              name="comentario" 
+                              placeholder="Estado del equipo, daños, observaciones..." 
+                              style="width:100%;padding:12px;border:1px solid #ddd;border-radius:4px;min-height:100px;resize:vertical;font-family:inherit;font-size:14px;box-sizing:border-box;background:white;color:black;outline:none"
+                              maxlength="500"></textarea>
                 </div>
                 <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:30px">
-                    <button onclick="returnProc.process()" style="background:#28a745;color:white;border:none;padding:12px 24px;border-radius:4px;cursor:pointer;font-size:16px">✓ Registrar Devolución</button>
-                    <button onclick="modal.close()" style="background:#6c757d;color:white;border:none;padding:12px 24px;border-radius:4px;cursor:pointer;font-size:16px">Cancelar</button>
+                    <button id="btn-devolver" type="button" style="background:#28a745;color:white;border:none;padding:12px 24px;border-radius:4px;cursor:pointer;font-size:16px">✓ Registrar Devolución</button>
+                    <button id="btn-cancelar-dev" type="button" style="background:#6c757d;color:white;border:none;padding:12px 24px;border-radius:4px;cursor:pointer;font-size:16px">Cancelar</button>
                 </div>
             </div>`;
+        
+        // Configurar eventos después de crear el DOM
+        setTimeout(() => {
+            const comentarioTextarea = document.getElementById('comentario-devolucion');
+            const btnDevolver = document.getElementById('btn-devolver');
+            const btnCancelar = document.getElementById('btn-cancelar-dev');
+            
+            // Configurar textarea
+            if (comentarioTextarea) {
+                comentarioTextarea.focus();
+            }
+            
+            // Configurar botones
+            if (btnDevolver) {
+                btnDevolver.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    returnProc.process();
+                });
+            }
+            
+            if (btnCancelar) {
+                btnCancelar.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    modal.close();
+                });
+            }
+            
+            console.log('✓ Formulario de devolución configurado');
+        }, 150);
     },
     
     close() { ui.showModal(false); }
